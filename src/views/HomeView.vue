@@ -47,8 +47,8 @@ import AMapLoader from '@amap/amap-jsapi-loader'
 import { Message } from '@arco-design/web-vue'
 import { heatmapData, shanghai } from '@/const/data'
 
-let map = null
-let _AMap = null
+let map: any = null
+let _AMap: any = null
 
 onMounted(() => {
   // window._AMapSecurityConfig = {
@@ -111,7 +111,7 @@ const handleMarkers = () => {
     const [lng, lat] = item
     setMarker(new _AMap.LngLat(lng, lat), this)
   })
-  function setMarker(position, that) {
+  function setMarker(position: any, that: any) {
     var marker = new _AMap.Marker({
       position,
       icon: 'https://a.amap.com/jsapi_demos/static/demo-center/icons/poi-marker-default.png',
@@ -146,7 +146,7 @@ const handleHeatMap = () => {
 }
 
 function handlePolygon() {
-  let polygon = new AMap.Polygon({
+  let polygon = new _AMap.Polygon({
     path: shanghai,
     fillColor: '#ccebc5',
     strokeOpacity: 1,
