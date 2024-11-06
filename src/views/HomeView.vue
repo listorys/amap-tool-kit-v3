@@ -1,42 +1,57 @@
 <template>
-  <div
-    class="fixed !w-[300px] z-[999] flex flex-col gap-2 p-3 right-0 top-0 text-text-5 bg-text-4/5 hover:bg-text-4/15 overflow-hidden m-2 rounded-md"
+  <a-drawer
+    :footer="false"
+    :header="false"
+    :width="380"
+    :visible="visible"
+    @ok="handleOk"
+    @cancel="handleCancel"
+    unmountOnClose
   >
-    <h2>坐标点</h2>
-    <a-textarea
-      class="w-full min-h-[130px]"
-      v-model="markerData"
-      placeholder="输入坐标点，如POINT (115.975944 40.462026)...，可多个"
-      allow-clear
-    />
-    <h2>围栏</h2>
-    <a-textarea
-      class="w-full min-h-[130px]"
-      v-model="polygonData"
-      placeholder="输入坐标点，如POINT (115.975944 40.462026)...，可多个"
-      allow-clear
-    />
-    <h2>热力</h2>
-    <a-textarea
-      class="w-full min-h-[130px]"
-      v-model="heatData"
-      placeholder="输入坐标点，如POINT (115.975944 40.462026)...，可多个"
-      allow-clear
-    />
-    <h2>网格</h2>
-    <a-textarea
-      class="w-full min-h-[130px]"
-      v-model="gridData"
-      placeholder="输入坐标点，如POINT (115.975944 40.462026)...，可多个"
-      allow-clear
-    />
-    <div class="flex gap-1 flex-wrap">
-      <a-button @click="handleMarkers">坐标点</a-button>
-      <a-button @click="handlePolygon">围栏</a-button>
-      <a-button @click="handleHeatMap">热力</a-button>
-      <a-button>网格</a-button>
-      <a-button @click="clearPolygons">清空</a-button>
+    <div>
+      <h2>坐标点</h2>
+      <a-textarea
+        auto-size
+        class="w-full"
+        v-model="markerData"
+        placeholder="输入坐标点，如POINT (115.975944 40.462026)...，可多个"
+        allow-clear
+      />
+      <h2>围栏</h2>
+      <a-textarea
+        auto-size
+        class="w-full"
+        v-model="polygonData"
+        placeholder="输入坐标点，如POINT (115.975944 40.462026)...，可多个"
+        allow-clear
+      />
+      <h2>网格</h2>
+      <a-textarea
+        auto-size
+        class="w-full"
+        v-model="gridData"
+        placeholder="输入坐标点，如POINT (115.975944 40.462026)...，可多个"
+        allow-clear
+      />
+      <h2>热力</h2>
+      <a-textarea
+        auto-size
+        class="w-full"
+        v-model="heatData"
+        placeholder="输入坐标点，如POINT (115.975944 40.462026)...，可多个"
+        allow-clear
+      />
+      <div class="flex flex-wrap gap-1">
+        <a-button @click="handleMarkers">坐标点</a-button>
+        <a-button @click="handlePolygon(0)">围栏</a-button>
+        <a-button @click="handlePolygon(1)">网格</a-button>
+        <a-button @click="handleHeatMap">热力</a-button>
+        <a-button @click="clearPolygons">清空</a-button>
+      </div>
     </div>
+  </a-drawer>
+  <div class="fixed z-[999] right-0 top-0 text-text-5 overflow-hidden m-2 rounded-md">
+    <a-button type="primary" @click="handleClick">控制</a-button>
   </div>
   <div id="container"></div>
 </template>
@@ -50,12 +65,24 @@ import { heatmapData, shanghai } from '@/const/data'
 let map = null
 let _AMap = null
 
+const visible = ref(false)
+
+const handleClick = () => {
+  visible.value = true
+}
+const handleOk = () => {
+  visible.value = false
+}
+const handleCancel = () => {
+  visible.value = false
+}
+
 onMounted(() => {
-  // window._AMapSecurityConfig = {
-  //   securityJsCode: '17d84e048fb846408c042b3cc3bbd7e4'
-  // }
+  window._AMapSecurityConfig = {
+    securityJsCode: '1086c2f3e379762b8bdc1c546cd8fa32'
+  }
   AMapLoader.load({
-    key: '17d84e048fb846408c042b3cc3bbd7e4', // 申请好的Web端开发者Key，首次调用 load 时必填
+    key: '99e0c5ea8ef689861a4c4d47701f6f77', // 申请好的Web端开发者Key，首次调用 load 时必填
     version: '2.0', // 指定要加载的 JSAPI 的版本，缺省时默认为 1.4.15
     plugins: ['AMap.Scale', 'AMap.HeatMap'], //需要使用的的插件列表，如比例尺'AMap.Scale'，支持添加多个如：['...','...']
     Loca: {
@@ -86,7 +113,10 @@ const markerData = ref(`POINT (115.975944 40.462026)
       POINT (116.8565085214192 40.38811656537166)
       POINT (116.8134796184506 40.36655759357838)`)
 
-const polygonData = ref('')
+const polygonData = ref(`POINT (115.975944 40.462026)
+      POINT (116.8565085214192 40.38811656537166)
+      POINT (116.8134796184506 40.36655759357838)`)
+// const polygonData = ref('')
 const heatData = ref('')
 const gridData = ref('')
 
@@ -97,10 +127,21 @@ const handleMarkers = () => {
   }
   const regex = /POINT \((-?\d+\.\d+)\s+(-?\d+\.\d+)\)/g // 正则表达式，匹配POINT记录
 
-  const points = []
-  let match
-  while ((match = regex.exec(markerData.value)) !== null) {
-    points.push([parseFloat(match[1]), parseFloat(match[2])]) // 提取匹配的数字并转换为Number类型
+  let points = []
+  if (regex.test(markerData.value)) {
+    let match
+    while ((match = regex.exec(markerData.value)) !== null) {
+      points.push([parseFloat(match[1]), parseFloat(match[2])]) // 提取匹配的数字并转换为Number类型
+    }
+  } else {
+    points = markerData.value
+      .trim()
+      .split('\n')
+      .map((line) => {
+        // 按空格分割每一行，转换为浮点数
+        const [x, y] = line.trim().split(' ').map(Number)
+        return [x, y] // 返回坐标点的数组
+      })
   }
 
   if (!points?.length) {
@@ -145,13 +186,34 @@ const handleHeatMap = () => {
   map?.setFitView()
 }
 
-function handlePolygon() {
-  let polygon = new AMap.Polygon({
-    path: shanghai,
-    fillColor: '#ccebc5',
+function extractCoordinates(pointsString) {
+  const regex = /POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/g // 正则表达式匹配坐标
+  const points = []
+  let match
+  // 使用 exec 方法提取所有匹配的坐标
+  while ((match = regex.exec(pointsString)) !== null) {
+    // match[1] 是 x 坐标，match[2] 是 y 坐标
+    const x = parseFloat(match[1])
+    const y = parseFloat(match[2])
+    points.push([x, y]) // 将坐标点以数组形式添加到结果中
+  }
+
+  return points // 返回最终的坐标数组
+}
+
+let polygon = null
+function handlePolygon(type: number) {
+  const fillColor = ['#23C343', '#4080FF'][type]
+  const strokeColor = ['#00B42A', '#165DFF'][type]
+  const hoverColor = ['#AFF0B5', '#BEDAFF'][type]
+  const sourceData = type ? gridData.value : polygonData.value
+  if (!sourceData) return
+  polygon = new AMap.Polygon({
+    path: extractCoordinates(sourceData),
+    fillColor,
     strokeOpacity: 1,
     fillOpacity: 0.5,
-    strokeColor: '#2b8cbe',
+    strokeColor,
     strokeWeight: 1,
     strokeStyle: 'dashed',
     strokeDasharray: [5, 5]
@@ -159,13 +221,13 @@ function handlePolygon() {
   polygon.on('mouseover', () => {
     polygon.setOptions({
       fillOpacity: 0.7,
-      fillColor: '#7bccc4'
+      fillColor: hoverColor
     })
   })
   polygon.on('mouseout', () => {
     polygon.setOptions({
       fillOpacity: 0.5,
-      fillColor: '#ccebc5'
+      fillColor
     })
   })
   map.add(polygon)
