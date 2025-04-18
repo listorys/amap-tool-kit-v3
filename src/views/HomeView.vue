@@ -8,45 +8,22 @@
     @cancel="handleCancel"
     unmountOnClose
   >
-    <div>
+    <div class="flex flex-col gap-4 !bg-white/20">
       <h2>坐标点</h2>
-      <a-textarea
-        auto-size
-        class="w-full"
-        v-model="markerData"
-        placeholder="输入坐标点，如POINT (115.975944 40.462026)...，可多个"
-        allow-clear
-      />
+      <a-textarea class="w-full" v-model="markerData" placeholder="请输入" allow-clear auto-size />
       <h2>围栏</h2>
-      <a-textarea
-        auto-size
-        class="w-full"
-        v-model="polygonData"
-        placeholder="输入坐标点，如POINT (115.975944 40.462026)...，可多个"
-        allow-clear
-      />
+      <a-textarea class="w-full" v-model="polygonData" placeholder="请输入" allow-clear auto-size />
       <h2>网格</h2>
-      <a-textarea
-        auto-size
-        class="w-full"
-        v-model="gridData"
-        placeholder="输入坐标点，如POINT (115.975944 40.462026)...，可多个"
-        allow-clear
-      />
+      <a-textarea class="w-full" v-model="gridData" placeholder="请输入" allow-clear auto-size />
       <h2>热力</h2>
-      <a-textarea
-        auto-size
-        class="w-full"
-        v-model="heatData"
-        placeholder="输入坐标点，如POINT (115.975944 40.462026)...，可多个"
-        allow-clear
-      />
-      <div class="flex flex-wrap gap-1">
-        <a-button @click="handleMarkers">坐标点</a-button>
-        <a-button @click="handlePolygon(0)">围栏</a-button>
-        <a-button @click="handlePolygon(1)">网格</a-button>
-        <a-button @click="handleHeatMap">热力</a-button>
-        <a-button @click="clearPolygons">清空</a-button>
+      <a-textarea class="w-full" v-model="heatData" placeholder="请输入" allow-clear auto-size />
+      <hr />
+      <div class="flex flex-wrap justify-around">
+        <a-button type="primary" @click="handleMarkers">坐标点</a-button>
+        <a-button type="primary" @click="handlePolygon(0)">围栏</a-button>
+        <a-button type="primary" @click="handlePolygon(1)">网格</a-button>
+        <a-button type="primary" @click="handleHeatMap">热力</a-button>
+        <a-button type="outline" @click="clearAll">清空</a-button>
       </div>
     </div>
   </a-drawer>
@@ -60,10 +37,11 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import AMapLoader from '@amap/amap-jsapi-loader'
 import { Message } from '@arco-design/web-vue'
-import { heatmapData, shanghai } from '@/const/data'
+import { heatmapData } from '@/const/data'
 
-let map = null
-let _AMap = null
+let map: any = null
+let _AMap: any = null
+let heatmap: any = null // 添加热力图层变量
 
 const visible = ref(false)
 
@@ -113,36 +91,27 @@ const markerData = ref(`POINT (115.975944 40.462026)
       POINT (116.8565085214192 40.38811656537166)
       POINT (116.8134796184506 40.36655759357838)`)
 
-const polygonData = ref(`POINT (115.975944 40.462026)
-      POINT (116.8565085214192 40.38811656537166)
-      POINT (116.8134796184506 40.36655759357838)`)
+const polygonData = ref(``)
 // const polygonData = ref('')
 const heatData = ref('')
 const gridData = ref('')
 
+// 控制标注
 const handleMarkers = () => {
   if (!markerData.value) {
     Message.warning('啥都不输入，还想生成是吧？给你来一👊')
     return
   }
-  const regex = /POINT \((-?\d+\.\d+)\s+(-?\d+\.\d+)\)/g // 正则表达式，匹配POINT记录
-
-  let points = []
-  if (regex.test(markerData.value)) {
-    let match
-    while ((match = regex.exec(markerData.value)) !== null) {
-      points.push([parseFloat(match[1]), parseFloat(match[2])]) // 提取匹配的数字并转换为Number类型
-    }
-  } else {
-    points = markerData.value
-      .trim()
-      .split('\n')
-      .map((line) => {
-        // 按空格分割每一行，转换为浮点数
-        const [x, y] = line.trim().split(' ').map(Number)
-        return [x, y] // 返回坐标点的数组
-      })
-  }
+  clearAll()
+  // 1. 替换 )   POINT ( 为 #
+  let str = markerData.value.replace(/\)\s+POINT\s+\(/g, '#')
+  // 2. 去掉开头的 POINT ( 和结尾的 )
+  str = str.replace(/^POINT\s+\(/, '').replace(/\)$/, '')
+  // 3. 按 # 分割并处理每个坐标
+  const points = str.split('#').map((point) => {
+    const [lng, lat] = point.trim().split(/\s+/).map(Number)
+    return [lng, lat]
+  })
 
   if (!points?.length) {
     Message.warning('标记数据格式错误，请输入有效的WKT格式')
@@ -152,7 +121,8 @@ const handleMarkers = () => {
     const [lng, lat] = item
     setMarker(new _AMap.LngLat(lng, lat), this)
   })
-  function setMarker(position, that) {
+
+  function setMarker(position: any, that: any) {
     var marker = new _AMap.Marker({
       position,
       icon: 'https://a.amap.com/jsapi_demos/static/demo-center/icons/poi-marker-default.png',
@@ -160,25 +130,17 @@ const handleMarkers = () => {
     })
     map.add(marker)
   }
+
   map?.setFitView()
 }
 
 const heatMapData = ref('')
 const handleHeatMap = () => {
-  const heatmap = new _AMap.HeatMap(map, {
-    radius: 25, //给定半径
+  clearAll()
+  heatmap = new _AMap.HeatMap(map, {
+    radius: 25,
     opacity: [0, 0.8]
-    /*,
-            gradient:{
-                0.5: 'blue',
-                0.65: 'rgb(117,211,248)',
-                0.7: 'rgb(0, 255, 0)',
-                0.9: '#ffea00',
-                1.0: 'red'
-            }
-             */
   })
-  //设置数据集：该数据为北京部分“公园”数据
   heatmap.setDataSet({
     data: heatmapData,
     max: 100
@@ -186,12 +148,14 @@ const handleHeatMap = () => {
   map?.setFitView()
 }
 
-function extractCoordinates(pointsString) {
-  const regex = /POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/g // 正则表达式匹配坐标
+function extractCoordinates(polygonString: string) {
+  // 使用正则表达式匹配坐标点
+  const regex = /(\d+\.\d+)\s+(\d+\.\d+)/g
   const points = []
   let match
+
   // 使用 exec 方法提取所有匹配的坐标
-  while ((match = regex.exec(pointsString)) !== null) {
+  while ((match = regex.exec(polygonString)) !== null) {
     // match[1] 是 x 坐标，match[2] 是 y 坐标
     const x = parseFloat(match[1])
     const y = parseFloat(match[2])
@@ -201,7 +165,7 @@ function extractCoordinates(pointsString) {
   return points // 返回最终的坐标数组
 }
 
-let polygon = null
+let polygon: any = null
 function handlePolygon(type: number) {
   const fillColor = ['#23C343', '#4080FF'][type]
   const strokeColor = ['#00B42A', '#165DFF'][type]
@@ -234,8 +198,14 @@ function handlePolygon(type: number) {
   map?.setFitView()
 }
 
-const clearPolygons = () => {
+const clearAll = () => {
   map?.clearMap()
+  if (heatmap) {
+    heatmap.setDataSet({
+      data: [],
+      max: 100
+    })
+  }
 }
 </script>
 
