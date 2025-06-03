@@ -8,16 +8,19 @@
     @cancel="handleCancel"
     unmountOnClose
   >
-    <div class="flex flex-col gap-4 !bg-white/20">
+    <div class="flex flex-col gap-2 !bg-white/20">
       <h2>坐标点</h2>
       <a-textarea class="w-full" v-model="markerData" placeholder="请输入" allow-clear auto-size />
+      <a-divider />
       <h2>围栏</h2>
       <a-textarea class="w-full" v-model="polygonData" placeholder="请输入" allow-clear auto-size />
+      <a-divider />
       <h2>网格</h2>
       <a-textarea class="w-full" v-model="gridData" placeholder="请输入" allow-clear auto-size />
+      <a-divider />
       <h2>热力</h2>
       <a-textarea class="w-full" v-model="heatData" placeholder="请输入" allow-clear auto-size />
-      <hr />
+      <a-divider />
       <div class="flex flex-wrap justify-around">
         <a-button type="primary" @click="handleMarkers">坐标点</a-button>
         <a-button type="primary" @click="handlePolygon(0)">围栏</a-button>
@@ -39,12 +42,9 @@ import AMapLoader from '@amap/amap-jsapi-loader'
 import { Message } from '@arco-design/web-vue'
 import { heatmapData } from '@/const/data'
 
-let map: any = null
-let _AMap: any = null
-let heatmap: any = null // 添加热力图层变量
-
 const visible = ref(false)
 
+// drawer control
 const handleClick = () => {
   visible.value = true
 }
@@ -55,7 +55,10 @@ const handleCancel = () => {
   visible.value = false
 }
 
-onMounted(() => {
+// amap 初始化
+let map: any = null
+let _AMap: any = null
+const initAmap = () => {
   window._AMapSecurityConfig = {
     securityJsCode: '1086c2f3e379762b8bdc1c546cd8fa32'
   }
@@ -81,18 +84,24 @@ onMounted(() => {
     .catch((e) => {
       console.log(e)
     })
+}
+
+onMounted(() => {
+  initAmap()
 })
 
 onUnmounted(() => {
-  map?.destroy()
+  if (map) {
+    map.destroy()
+    map = null
+  }
 })
 
-const markerData = ref(`POINT (115.975944 40.462026)
-      POINT (116.8565085214192 40.38811656537166)
-      POINT (116.8134796184506 40.36655759357838)`)
-
+// 标注点
+const markerData = ref(``)
+// 围栏
 const polygonData = ref(``)
-// const polygonData = ref('')
+// 热力
 const heatData = ref('')
 const gridData = ref('')
 
@@ -103,18 +112,28 @@ const handleMarkers = () => {
     return
   }
   clearAll()
-  // 1. 替换 )   POINT ( 为 #
-  let str = markerData.value.replace(/\)\s+POINT\s+\(/g, '#')
-  // 2. 去掉开头的 POINT ( 和结尾的 )
-  str = str.replace(/^POINT\s+\(/, '').replace(/\)$/, '')
-  // 3. 按 # 分割并处理每个坐标
-  const points = str.split('#').map((point) => {
-    const [lng, lat] = point.trim().split(/\s+/).map(Number)
-    return [lng, lat]
-  })
+  let points = []
+  try {
+    // 1. 替换 )   POINT ( 为 #
+    let str = markerData.value.trim().replace(/\)\s+POINT\s+\(/g, '#')
+    // 2. 去掉开头的 POINT ( 和结尾的 )
+    str = str.replace(/^POINT\s+\(/, '').replace(/\)$/, '')
+    // 3. 按 # 分割并处理每个坐标
+    points = str.split('#').map((point) => {
+      const [lng, lat] = point.trim().split(/\s+/).map(Number)
+      if (!lng || !lat) {
+        throw Error
+      }
+      return [lng, lat]
+    })
+  } catch (error) {
+    Message.warning('标记数据格式错误，仅支持有效的WKT格式，请检查数据')
+    points = []
+    return
+  }
 
   if (!points?.length) {
-    Message.warning('标记数据格式错误，请输入有效的WKT格式')
+    Message.warning('标记数据格式错误，仅支持有效的WKT格式，请检查数据')
     return
   }
   points.forEach((item) => {
@@ -134,6 +153,7 @@ const handleMarkers = () => {
   map?.setFitView()
 }
 
+let heatmap: any = null // 添加热力图层变量
 const heatMapData = ref('')
 const handleHeatMap = () => {
   clearAll()
