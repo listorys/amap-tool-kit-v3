@@ -14,6 +14,7 @@
       <a-divider />
       <h2>围栏</h2>
       <a-textarea class="w-full" v-model="polygonData" placeholder="请输入" allow-clear auto-size />
+      {{ polygonDataArr }}
       <a-divider />
       <h2>网格</h2>
       <a-textarea class="w-full" v-model="gridData" placeholder="请输入" allow-clear auto-size />
@@ -21,11 +22,12 @@
       <h2>热力</h2>
       <a-textarea class="w-full" v-model="heatData" placeholder="请输入" allow-clear auto-size />
       <a-divider />
-      <div class="flex flex-wrap justify-around">
+      <div class="flex flex-wrap gap-2">
         <a-button type="primary" @click="handleMarkers">坐标点</a-button>
         <a-button type="primary" @click="handlePolygon(0)">围栏</a-button>
         <a-button type="primary" @click="handlePolygon(1)">网格</a-button>
         <a-button type="primary" @click="handleHeatMap">热力</a-button>
+        <a-button type="outline" @click="fillSampleData">填充</a-button>
         <a-button type="outline" @click="clearAll">清空</a-button>
       </div>
     </div>
@@ -105,13 +107,13 @@ const polygonData = ref(``)
 const heatData = ref('')
 const gridData = ref('')
 
-// 控制标注
+// 标注点控制
 const handleMarkers = () => {
   if (!markerData.value) {
-    Message.warning('啥都不输入，还想生成是吧？给你来一👊')
+    Message.warning('啥都不填，还想生成是吧？给你来一👊')
     return
   }
-  clearAll()
+  // clearAll()
   let points = []
   try {
     // 1. 替换 )   POINT ( 为 #
@@ -153,10 +155,15 @@ const handleMarkers = () => {
   map?.setFitView()
 }
 
+// 热力控制
 let heatmap: any = null // 添加热力图层变量
 const heatMapData = ref('')
 const handleHeatMap = () => {
   clearAll()
+  if (!heatData.value) {
+    Message.warning('啥都不填，还想生成是吧？给你来一👊')
+    return
+  }
   heatmap = new _AMap.HeatMap(map, {
     radius: 25,
     opacity: [0, 0.8]
@@ -168,53 +175,60 @@ const handleHeatMap = () => {
   map?.setFitView()
 }
 
-function extractCoordinates(polygonString: string) {
-  // 使用正则表达式匹配坐标点
-  const regex = /(\d+\.\d+)\s+(\d+\.\d+)/g
-  const points = []
-  let match
+function wktTo3DArray(wkt: string): number[][][] {
+  return wkt
+    .split('POLYGON')
+    .filter((poly) => poly.trim())
+    .map((poly) => {
+      const cleaned = poly.replace(/[()]/g, '').trim()
 
-  // 使用 exec 方法提取所有匹配的坐标
-  while ((match = regex.exec(polygonString)) !== null) {
-    // match[1] 是 x 坐标，match[2] 是 y 坐标
-    const x = parseFloat(match[1])
-    const y = parseFloat(match[2])
-    points.push([x, y]) // 将坐标点以数组形式添加到结果中
-  }
-
-  return points // 返回最终的坐标数组
+      return cleaned.split(',').map((point) => {
+        const [lng, lat] = point.trim().split(' ').map(Number)
+        return [lng, lat]
+      })
+    })
 }
 
 let polygon: any = null
+let polygonDataArr = ref([])
 function handlePolygon(type: number) {
   const fillColor = ['#23C343', '#4080FF'][type]
   const strokeColor = ['#00B42A', '#165DFF'][type]
   const hoverColor = ['#AFF0B5', '#BEDAFF'][type]
   const sourceData = type ? gridData.value : polygonData.value
-  if (!sourceData) return
-  polygon = new AMap.Polygon({
-    path: extractCoordinates(sourceData),
-    fillColor,
-    strokeOpacity: 1,
-    fillOpacity: 0.5,
-    strokeColor,
-    strokeWeight: 1,
-    strokeStyle: 'dashed',
-    strokeDasharray: [5, 5]
-  })
-  polygon.on('mouseover', () => {
-    polygon.setOptions({
-      fillOpacity: 0.7,
-      fillColor: hoverColor
-    })
-  })
-  polygon.on('mouseout', () => {
-    polygon.setOptions({
+  if (!sourceData) {
+    Message.warning('啥都不填，还想生成是吧？给你来一👊')
+    return
+  }
+  polygonDataArr.value = wktTo3DArray(sourceData)
+  const addPolygon = (data) => {
+    polygon = new _AMap.Polygon({
+      path: data,
+      fillColor,
+      strokeOpacity: 1,
       fillOpacity: 0.5,
-      fillColor
+      strokeColor,
+      strokeWeight: 1,
+      strokeStyle: 'dashed',
+      strokeDasharray: [5, 5]
     })
+    polygon.on('mouseover', () => {
+      polygon.setOptions({
+        fillOpacity: 0.7,
+        fillColor: hoverColor
+      })
+    })
+    polygon.on('mouseout', () => {
+      polygon.setOptions({
+        fillOpacity: 0.5,
+        fillColor
+      })
+    })
+    map.add(polygon)
+  }
+  polygonDataArr.value.forEach((item) => {
+    addPolygon(item)
   })
-  map.add(polygon)
   map?.setFitView()
 }
 
@@ -226,6 +240,25 @@ const clearAll = () => {
       max: 100
     })
   }
+}
+
+const fillSampleData = () => {
+  markerData.value = `POINT (116.397428 39.90923)
+POINT (116.406667 39.902778)
+POINT (116.391389 39.895833)
+POINT (116.400278 39.889722)
+POINT (116.409722 39.883333)
+POINT (116.420833 39.876389)`
+  polygonData.value = `POLYGON ((121.472503 31.173277, 121.470264 31.173283, 121.470264 31.175205, 121.472503 31.1752, 121.472503 31.173277))
+POLYGON ((121.474741 31.173271, 121.472503 31.173277, 121.472503 31.1752, 121.474742 31.175194, 121.474741 31.173271))
+POLYGON ((121.47698 31.173265, 121.474741 31.173271, 121.474742 31.175194, 121.47698 31.175188, 121.47698 31.173265))
+POLYGON ((121.472503 31.1752, 121.470264 31.175205, 121.470264 31.177128, 121.472503 31.177122, 121.472503 31.1752))
+POLYGON ((121.474742 31.175194, 121.472503 31.1752, 121.472503 31.177122, 121.474742 31.177116, 121.474742 31.175194))
+POLYGON ((121.47698 31.175188, 121.474742 31.175194, 121.474742 31.177116, 121.47698 31.17711, 121.47698 31.175188))
+POLYGON ((121.479219 31.175182, 121.47698 31.175188, 121.47698 31.17711, 121.479219 31.177104, 121.479219 31.175182))
+POLYGON ((121.481457 31.175175, 121.479219 31.175182, 121.479219 31.177104, 121.481457 31.177098, 121.481457 31.175175))
+POLYGON ((121.468025 31.177133, 121.466663 31.177137, 121.466727 31.17889, 121.466799 31.179059, 121.468025 31.179056, 121.468025 31.177133))
+POLYGON ((121.470264 31.177128, 121.468025 31.177133, 121.468025 31.179056, 121.470264 31.17905, 121.470264 31.177128))`
 }
 </script>
 
