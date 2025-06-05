@@ -29,6 +29,8 @@
         <a-button type="primary" @click="handleHeatMap">热力</a-button>
         <a-button type="outline" @click="fillSampleData">填充</a-button>
         <a-button type="outline" @click="clearAll">清空</a-button>
+        <a-button type="outline" @click="addSimplePolygon">生成示例围栏</a-button>
+        <a-button type="outline" @click="scaleFn(2.5)">放大2.5</a-button>
       </div>
     </div>
   </a-drawer>
@@ -143,16 +145,16 @@ const handleMarkers = () => {
     setMarker(new _AMap.LngLat(lng, lat), this)
   })
 
-  function setMarker(position: any, that: any) {
-    var marker = new _AMap.Marker({
-      position,
-      icon: 'https://a.amap.com/jsapi_demos/static/demo-center/icons/poi-marker-default.png',
-      offset: new _AMap.Pixel(-13, -30)
-    })
-    map.add(marker)
-  }
-
   map?.setFitView()
+}
+
+function setMarker(position: any, that: any) {
+  var marker = new _AMap.Marker({
+    position,
+    icon: 'https://a.amap.com/jsapi_demos/static/demo-center/icons/poi-marker-default.png',
+    offset: new _AMap.Pixel(-13, -30)
+  })
+  map.add(marker)
 }
 
 // 热力控制
@@ -191,43 +193,44 @@ function wktTo3DArray(wkt: string): number[][][] {
 
 let polygon: any = null
 let polygonDataArr = ref([])
-function handlePolygon(type: number) {
+
+const addPolygon = (data, type) => {
   const fillColor = ['#23C343', '#4080FF'][type]
   const strokeColor = ['#00B42A', '#165DFF'][type]
   const hoverColor = ['#AFF0B5', '#BEDAFF'][type]
+  polygon = new _AMap.Polygon({
+    path: data,
+    fillColor,
+    strokeOpacity: 1,
+    fillOpacity: 0.5,
+    strokeColor,
+    strokeWeight: 1,
+    strokeStyle: 'dashed',
+    strokeDasharray: [5, 5]
+  })
+  polygon.on('mouseover', () => {
+    polygon.setOptions({
+      fillOpacity: 0.7,
+      fillColor: hoverColor
+    })
+  })
+  polygon.on('mouseout', () => {
+    polygon.setOptions({
+      fillOpacity: 0.5,
+      fillColor
+    })
+  })
+  map.add(polygon)
+}
+function handlePolygon(type: number) {
   const sourceData = type ? gridData.value : polygonData.value
   if (!sourceData) {
     Message.warning('啥都不填，还想生成是吧？给你来一👊')
     return
   }
   polygonDataArr.value = wktTo3DArray(sourceData)
-  const addPolygon = (data) => {
-    polygon = new _AMap.Polygon({
-      path: data,
-      fillColor,
-      strokeOpacity: 1,
-      fillOpacity: 0.5,
-      strokeColor,
-      strokeWeight: 1,
-      strokeStyle: 'dashed',
-      strokeDasharray: [5, 5]
-    })
-    polygon.on('mouseover', () => {
-      polygon.setOptions({
-        fillOpacity: 0.7,
-        fillColor: hoverColor
-      })
-    })
-    polygon.on('mouseout', () => {
-      polygon.setOptions({
-        fillOpacity: 0.5,
-        fillColor
-      })
-    })
-    map.add(polygon)
-  }
   polygonDataArr.value.forEach((item) => {
-    addPolygon(item)
+    addPolygon(item, type)
   })
   map?.setFitView()
 }
@@ -259,6 +262,58 @@ POLYGON ((121.479219 31.175182, 121.47698 31.175188, 121.47698 31.17711, 121.479
 POLYGON ((121.481457 31.175175, 121.479219 31.175182, 121.479219 31.177104, 121.481457 31.177098, 121.481457 31.175175))
 POLYGON ((121.468025 31.177133, 121.466663 31.177137, 121.466727 31.17889, 121.466799 31.179059, 121.468025 31.179056, 121.468025 31.177133))
 POLYGON ((121.470264 31.177128, 121.468025 31.177133, 121.468025 31.179056, 121.470264 31.17905, 121.470264 31.177128))`
+}
+
+// 缩放函数
+function scalePolygon(polygon, scale) {
+  const path = polygon.getPath()
+  console.log(path)
+  const center = path.reduce(
+    (acc, point) => {
+      acc.lng += point.lng
+      acc.lat += point.lat
+      return acc
+    },
+    { lng: 0, lat: 0 }
+  )
+  center.lng /= path.length
+  center.lat /= path.length
+
+  // 标注中心点
+  setMarker(new _AMap.LngLat(center.lng, center.lat), this)
+
+  const newPath = path.map((point) => {
+    const dx = point.lng - center.lng
+    const dy = point.lat - center.lat
+    return new _AMap.LngLat(center.lng + dx * scale, center.lat + dy * scale)
+  })
+  polygon.setPath(newPath)
+}
+
+const scaleFn = (scale) => {
+  scalePolygon(simplePolygon.value, scale)
+}
+
+const simplePolygon = ref()
+const addSimplePolygon = () => {
+  // 创建原始多边形
+  simplePolygon.value = new _AMap.Polygon({
+    path: [
+      [121.7789, 31.3102],
+      [121.7279, 31.3548],
+      [121.5723, 31.4361],
+      [121.5093, 31.4898],
+      [121.5624, 31.4864],
+      [121.5856, 31.4547],
+      [121.7694, 31.3907],
+      [121.796, 31.3456],
+      [121.7789, 31.3102]
+    ],
+    strokeColor: 'blue',
+    fillColor: 'rgba(0,0,255,0.3)'
+  })
+  map.add(simplePolygon.value)
+  map.setFitView()
 }
 </script>
 
