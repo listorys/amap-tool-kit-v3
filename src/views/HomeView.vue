@@ -14,7 +14,7 @@
       <a-divider />
       <h2>围栏</h2>
       <a-textarea class="w-full" v-model="polygonData" placeholder="请输入" allow-clear auto-size />
-      {{ polygonDataArr }}
+      <!-- {{ polygonDataArr }} -->
       <a-divider />
       <h2>网格</h2>
       <a-textarea class="w-full" v-model="gridData" placeholder="请输入" allow-clear auto-size />
@@ -32,6 +32,10 @@
         <a-button type="outline" @click="addSimplePolygon">生成示例围栏</a-button>
         <a-button type="outline" @click="scaleFn(2.5)">放大2.5</a-button>
       </div>
+      <div>
+        <a-divider />
+        测距 <a-switch @change="handleRuler" v-model="isShowRuler" />
+      </div>
     </div>
   </a-drawer>
   <div class="fixed z-[999] right-0 top-0 text-text-5 overflow-hidden m-2 rounded-md">
@@ -41,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import AMapLoader from '@amap/amap-jsapi-loader'
 import { Message } from '@arco-design/web-vue'
 import { heatmapData } from '@/const/data'
@@ -62,6 +66,7 @@ const handleCancel = () => {
 // amap 初始化
 let map: any = null
 let _AMap: any = null
+let rangeTool: any = null
 const initAmap = () => {
   window._AMapSecurityConfig = {
     securityJsCode: '1086c2f3e379762b8bdc1c546cd8fa32'
@@ -69,7 +74,7 @@ const initAmap = () => {
   AMapLoader.load({
     key: '99e0c5ea8ef689861a4c4d47701f6f77', // 申请好的Web端开发者Key，首次调用 load 时必填
     version: '2.0', // 指定要加载的 JSAPI 的版本，缺省时默认为 1.4.15
-    plugins: ['AMap.Scale', 'AMap.HeatMap'], //需要使用的的插件列表，如比例尺'AMap.Scale'，支持添加多个如：['...','...']
+    plugins: ['AMap.Scale', 'AMap.HeatMap', 'AMap.RangingTool'], //需要使用的的插件列表，如比例尺'AMap.Scale'，支持添加多个如：['...','...']
     Loca: {
       // 是否加载 Loca， 缺省不加载
       version: '2.0.0' // Loca 版本，缺省 1.3.2
@@ -84,10 +89,35 @@ const initAmap = () => {
         zoom: 11 // 初始化地图级别
         // center: [116.397428, 39.90923] // 初始化地图中心点位置
       })
+
+      // 创建比例尺控件 (左下角位置)
+      const scale = new AMap.Scale({
+        position: 'LB',
+        visible: true
+      })
+      map.addControl(scale)
+
+      // 初始化测距工具
+      rangeTool = new AMap.RangingTool(map)
+      // 监听测量完成事件
+      rangeTool.on('end', (e: any) => {
+        console.log('测量结果:', e)
+      })
+      rangeTool.turnOn()
     })
     .catch((e) => {
       console.log(e)
     })
+}
+
+const isShowRuler = ref(true)
+
+const handleRuler = () => {
+  if (isShowRuler.value) {
+    rangeTool.turnOn()
+  } else {
+    rangeTool.turnOff()
+  }
 }
 
 onMounted(() => {
